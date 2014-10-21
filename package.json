@@ -1,15 +1,14 @@
 {
-  "name": "proxy",
-  "version": "0.0.0",
-  "description": "",
-  "main": "proxy.js",
+  "name": "composer-proxy",
+  "version": "0.1.0",
+  "description": "Composer proxy to use inside intranet network",
+  "main": "lib/proxy.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Ganesha <reekoheek@gmail.com>",
+  "license": "MIT",
   "dependencies": {
-    "request": "^2.42.0",
     "q": "^1.0.1",
     "mkdirp": "^0.5.0"
   }
