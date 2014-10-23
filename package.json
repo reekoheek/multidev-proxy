@@ -1,6 +1,6 @@
 {
   "name": "multidev-proxy",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Multi development proxy to use inside intranet network, support for Composer, NPM, and Github dist",
   "main": "lib/proxy.js",
   "bin": {
