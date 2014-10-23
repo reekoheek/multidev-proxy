@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-var ComposerProxy = require('../lib/proxy');
+var ComposerProxy = require('../lib/proxy'),
+    Q = require('q');
 
 var proxy = new ComposerProxy({
     'routes': [
@@ -30,7 +31,6 @@ var proxy = new ComposerProxy({
                         var packageName = cachePath.match(/\/p\/(.*)\$/)[1];
                         var toPathOrig = cachePath.replace('/https-packagist.org', '/local');
                         var toPath, json, sum;
-
                         Q.nfcall(fs.readFile, cachePath).then(function(data) {
                             var d = Q.defer();
                             try {
