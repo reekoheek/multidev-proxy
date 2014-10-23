@@ -1,0 +1,105 @@
+#!/usr/bin/env node
+
+var ComposerProxy = require('../lib/proxy');
+
+var proxy = new ComposerProxy({
+    'routes': [
+        {
+            matcher: /^\/local(\/.*)$/,
+            name: 'local',
+            handler: './handlers/local'
+        },
+        {
+            matcher: /^\/registry\.npmjs\.org(\/.*)$/,
+            url: 'http://registry.npmjs.org',
+            handler: './handlers/npm'
+        },
+        {
+            matcher: /^\/api\.github\.com(\/.*)$/,
+            url: 'https://api.github.com',
+            handler: './handlers/github'
+        },
+        {
+            matcher: /^(\/.*)$/,
+            url: 'https://packagist.org',
+            handler: './handlers/packagist',
+            onRead: function(cachePath) {
+                var deferred = Q.defer();
+                try {
+                    if (cachePath.indexOf('https-packagist.org') && cachePath.indexOf('/packages.json') === -1 && cachePath.indexOf('/p/provider-') === -1) {
+                        var packageName = cachePath.match(/\/p\/(.*)\$/)[1];
+                        var toPathOrig = cachePath.replace('/https-packagist.org', '/local');
+                        var toPath, json, sum;
+
+                        Q.nfcall(fs.readFile, cachePath).then(function(data) {
+                            var d = Q.defer();
+                            try {
+                                data = JSON.parse(data);
+
+                                json = JSON.stringify(data, null, 4)
+                                    .replace(/https:\/\/api\.github\.com/g, 'http://localhost:8765/api.github.com');
+                                sum = sha256(json);
+                                toPath = toPathOrig.split('$')[0] + '$' + sum + '.json';
+
+                                fs.exists(toPath, function(exists) {
+                                    if (exists) {
+                                        d.reject();
+                                    } else {
+                                        d.resolve();
+                                    }
+                                });
+                            } catch(e) {
+                                console.trace(e);
+                                d.reject();
+                            }
+                            return d.promise;
+                        }).then(function() {
+                            return Q.nfcall(mkdirp, path.dirname(toPath));
+                        }).then(function() {
+                            return Q.nfcall(fs.writeFile, toPath, json);
+                        }).then(function() {
+                            var d = Q.defer();
+                            var packageJson = {
+                                "packages":[],
+                                "notify":"\/local\/downloads\/%package%",
+                                "notify-batch":"\/local\/downloads\/",
+                                "providers-url":"\/local\/p\/%package%$%hash%.json",
+                                "search":"\/local\/search.json?q=%query%",
+                                "providers": {}
+                            };
+                            // {"sha256":"2178005d7f6504bacb41b0783b00d5b767825a58d4141590de86194bbbc1decb"}
+
+                            var next = function() {
+                                packageJson.providers = packageJson.providers || {};
+                                packageJson.providers[packageName] = {
+                                    sha256: sum
+                                };
+                                d.resolve(packageJson);
+                            };
+                            Q.nfcall(fs.readFile, './cache/local/packages.json').then(function(data) {
+                                packageJson = JSON.parse(data.toString());
+                                next();
+                            }, function() {
+                                next();
+                            });
+                            return d.promise;
+                        }).then(function(packageJson) {
+                            return Q.nfcall(fs.writeFile, './cache/local/packages.json', JSON.stringify(packageJson, null, 4));
+                        }).then(deferred.resolve, deferred.resolve);
+                    } else {
+                        deferred.resolve();
+                    }
+                } catch(e) {
+                    console.trace(e);
+                    deferred.resolve();
+                }
+
+                return deferred.promise;
+            }
+        }
+    ]
+});
+
+proxy.listen(8765, function() {
+    console.log('Multi development proxy running on http://' + proxy.server.address().address + ':' + proxy.server.address().port);
+});
