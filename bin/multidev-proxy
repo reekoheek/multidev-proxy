@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 var ComposerProxy = require('../lib/proxy'),
-    Q = require('q');
+    Q = require('q'),
+    path = require('path'),
+    fs = require('fs');
 
 var proxy = new ComposerProxy({
     'routes': [
@@ -12,7 +14,7 @@ var proxy = new ComposerProxy({
         },
         {
             matcher: /^\/registry\.npmjs\.org(\/.*)$/,
-            url: 'http://registry.npmjs.org',
+            url: 'https://registry.npmjs.org',
             handler: './handlers/npm'
         },
         {
@@ -101,5 +103,8 @@ var proxy = new ComposerProxy({
 });
 
 proxy.listen(8765, function() {
+    var packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
+
+    console.log(packageJson.name + ' v' + packageJson.version);
     console.log('Multi development proxy running on http://' + proxy.server.address().address + ':' + proxy.server.address().port);
 });
