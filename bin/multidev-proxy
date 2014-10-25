@@ -38,7 +38,6 @@ var proxy = new ComposerProxy({
                             var d = Q.defer();
                             try {
                                 data = JSON.parse(data);
-
                                 json = JSON.stringify(data, null, 4)
                                     .replace(/https:\/\/api\.github\.com/g, 'http://localhost:8765/api.github.com');
                                 sum = sha256(json);
