@@ -2,14 +2,15 @@
 
 var ComposerProxy = require('../lib/proxy'),
     Q = require('q'),
+    sha256 = require('sha256'),
     path = require('path'),
     fs = require('fs');
 
 var proxy = new ComposerProxy({
     'routes': [
         {
-            matcher: /^\/local(\/.*)$/,
-            name: 'local',
+            matcher: /^\/packagist-cache(\/.*)$/,
+            name: 'packagist-cache',
             handler: './handlers/local'
         },
         {
@@ -31,7 +32,7 @@ var proxy = new ComposerProxy({
                 try {
                     if (cachePath.indexOf('https-packagist.org') && cachePath.indexOf('/packages.json') === -1 && cachePath.indexOf('/p/provider-') === -1) {
                         var packageName = cachePath.match(/\/p\/(.*)\$/)[1];
-                        var toPathOrig = cachePath.replace('/https-packagist.org', '/local');
+                        var toPathOrig = cachePath.replace('/https-packagist.org', '/packagist-cache');
                         var toPath, json, sum;
                         Q.nfcall(fs.readFile, cachePath).then(function(data) {
                             var d = Q.defer();
@@ -63,10 +64,10 @@ var proxy = new ComposerProxy({
                             var d = Q.defer();
                             var packageJson = {
                                 "packages":[],
-                                "notify":"\/local\/downloads\/%package%",
-                                "notify-batch":"\/local\/downloads\/",
-                                "providers-url":"\/local\/p\/%package%$%hash%.json",
-                                "search":"\/local\/search.json?q=%query%",
+                                "notify":"\/packagist-cache\/downloads\/%package%",
+                                "notify-batch":"\/packagist-cache\/downloads\/",
+                                "providers-url":"\/packagist-cache\/p\/%package%$%hash%.json",
+                                "search":"\/packagist-cache\/search.json?q=%query%",
                                 "providers": {}
                             };
                             // {"sha256":"2178005d7f6504bacb41b0783b00d5b767825a58d4141590de86194bbbc1decb"}
@@ -78,7 +79,7 @@ var proxy = new ComposerProxy({
                                 };
                                 d.resolve(packageJson);
                             };
-                            Q.nfcall(fs.readFile, './cache/local/packages.json').then(function(data) {
+                            Q.nfcall(fs.readFile, './cache/packagist-cache/packages.json').then(function(data) {
                                 packageJson = JSON.parse(data.toString());
                                 next();
                             }, function() {
@@ -86,7 +87,7 @@ var proxy = new ComposerProxy({
                             });
                             return d.promise;
                         }).then(function(packageJson) {
-                            return Q.nfcall(fs.writeFile, './cache/local/packages.json', JSON.stringify(packageJson, null, 4));
+                            return Q.nfcall(fs.writeFile, './cache/packagist-cache/packages.json', JSON.stringify(packageJson, null, 4));
                         }).then(deferred.resolve, deferred.resolve);
                     } else {
                         deferred.resolve();
