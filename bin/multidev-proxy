@@ -4,7 +4,9 @@ var ComposerProxy = require('../lib/proxy'),
     Q = require('q'),
     sha256 = require('sha256'),
     path = require('path'),
-    fs = require('fs');
+    fs = require('fs'),
+    mkdirp = require('mkdirp'),
+    crypto = require('crypto');
 
 var proxy = new ComposerProxy({
     'routes': [
@@ -33,32 +35,63 @@ var proxy = new ComposerProxy({
                     if (cachePath.indexOf('https-packagist.org') && cachePath.indexOf('/packages.json') === -1 && cachePath.indexOf('/p/provider-') === -1) {
                         var packageName = cachePath.match(/\/p\/(.*)\$/)[1];
                         var toPathOrig = cachePath.replace('/https-packagist.org', '/packagist-cache');
+                        var packageFile = toPathOrig.split('packagist-cache')[0] + 'packagist-cache/packages.json';
                         var toPath, json, sum;
+                        Q.all([function() {
+                            var r = fs.createReadStream(cachePath);
+                            r.on('data', function(chunk) {
+
+                            });
+
+                            r.on('end', function() {
+
+                            });
+                        }])
                         Q.nfcall(fs.readFile, cachePath).then(function(data) {
                             var d = Q.defer();
                             try {
                                 data = JSON.parse(data);
                                 json = JSON.stringify(data, null, 4)
                                     .replace(/https:\/\/api\.github\.com/g, 'http://localhost:8765/api.github.com');
-                                sum = sha256(json);
-                                toPath = toPathOrig.split('$')[0] + '$' + sum + '.json';
 
-                                fs.exists(toPath, function(exists) {
-                                    if (exists) {
-                                        d.reject();
-                                    } else {
-                                        d.resolve();
-                                    }
-                                });
+                                d.resolve();
+                                // fs.exists(toPath, function(exists) {
+                                //     if (exists) {
+                                //         d.reject(new Error('Destination path not exists'));
+                                //     } else {
+                                //         d.resolve();
+                                //     }
+                                // });
                             } catch(e) {
+                                console.error('[json parse error]');
                                 console.trace(e);
-                                d.reject();
+                                d.reject(e);
                             }
                             return d.promise;
                         }).then(function() {
-                            return Q.nfcall(mkdirp, path.dirname(toPath));
+                            return Q.nfcall(mkdirp, path.dirname(toPathOrig));
                         }).then(function() {
-                            return Q.nfcall(fs.writeFile, toPath, json);
+                            var d = Q.defer();
+                            // sum = crypto.createHash('sha256').update(json).digest('hex');
+                            fs.writeFileSync(toPathOrig, json);
+
+                            var shasum = crypto.createHash('sha256');
+
+                            var s = fs.createReadStream(toPathOrig);
+                            s.on('data', function(chunk) { shasum.update(chunk); });
+                            s.on('end', function() {
+                                sum = shasum.digest('hex');
+
+                                toPath = toPathOrig.split('$')[0] + '$' + sum + '.json';
+
+                                fs.renameSync(toPathOrig, toPath);
+
+                                d.resolve();
+
+                            });
+
+                            return d.promise;
+                            // return Q.nfcall(fs.writeFile, toPath, json);
                         }).then(function() {
                             var d = Q.defer();
                             var packageJson = {
@@ -78,7 +111,8 @@ var proxy = new ComposerProxy({
                                 };
                                 d.resolve(packageJson);
                             };
-                            Q.nfcall(fs.readFile, './cache/packagist-cache/packages.json').then(function(data) {
+
+                            Q.nfcall(fs.readFile, packageFile).then(function(data) {
                                 packageJson = JSON.parse(data.toString());
                                 next();
                             }, function() {
@@ -86,12 +120,15 @@ var proxy = new ComposerProxy({
                             });
                             return d.promise;
                         }).then(function(packageJson) {
-                            return Q.nfcall(fs.writeFile, './cache/packagist-cache/packages.json', JSON.stringify(packageJson, null, 4));
-                        }).then(deferred.resolve, deferred.resolve);
+                            return Q.nfcall(fs.writeFile, packageFile, JSON.stringify(packageJson, null, 4));
+                        }).then(deferred.resolve, function(e) {
+                            deferred.resolve();
+                        });
                     } else {
                         deferred.resolve();
                     }
                 } catch(e) {
+                    console.error('[error!!!]');
                     console.trace(e);
                     deferred.resolve();
                 }
